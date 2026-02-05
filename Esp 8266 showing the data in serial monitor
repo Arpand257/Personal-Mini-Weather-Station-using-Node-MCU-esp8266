@@ -1,0 +1,96 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <DHT.h>
+
+
+const char* ssid = "YOUR_WIFI_NAME";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+
+#define DHTPIN D4
+#define DHTTYPE DHT11
+
+#define MQ135_PIN A0
+#define LDR_PIN D5
+#define RAIN_PIN D6
+
+
+DHT dht(DHTPIN, DHTTYPE);
+ESP8266WebServer server(80);
+
+
+void handleRoot() {
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+  int air = analogRead(MQ135_PIN);
+  int light = digitalRead(LDR_PIN);
+  int rain = digitalRead(RAIN_PIN);
+
+  String html = "<!DOCTYPE html><html>";
+  html += "<head><title>Weather Monitoring</title>";
+  html += "<meta http-equiv='refresh' content='3'>";
+  html += "<style>";
+  html += "body{font-family:Arial;text-align:center;background:#f2f2f2;}";
+  html += "h1{color:#333;}";
+  html += ".card{background:white;padding:20px;margin:15px;border-radius:10px;box-shadow:0 0 10px #aaa;}";
+  html += "</style></head><body>";
+
+  html += "<h1>🌦️ Weather Detection System</h1>";
+
+  html += "<div class='card'>";
+  html += "<h2>Temperature</h2>";
+  html += "<p>" + String(temp) + " °C</p>";
+  html += "</div>";
+
+  html += "<div class='card'>";
+  html += "<h2>Humidity</h2>";
+  html += "<p>" + String(hum) + " %</p>";
+  html += "</div>";
+
+  html += "<div class='card'>";
+  html += "<h2>Air Quality (MQ135)</h2>";
+  html += "<p>" + String(air) + "</p>";
+  html += "</div>";
+
+  html += "<div class='card'>";
+  html += "<h2>Sunlight</h2>";
+  html += (light == LOW) ? "<p>Bright ☀️</p>" : "<p>Dark 🌙</p>";
+  html += "</div>";
+
+  html += "<div class='card'>";
+  html += "<h2>Rain Status</h2>";
+  html += (rain == LOW) ? "<p>Raining 🌧️</p>" : "<p>No Rain ☁️</p>";
+  html += "</div>";
+
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
+}
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+
+  pinMode(LDR_PIN, INPUT);
+  pinMode(RAIN_PIN, INPUT);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi Connected");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handleRoot);
+  server.begin();
+  Serial.println("Web Server Started");
+}
+
+void loop() {
+  server.handleClient();
+}
