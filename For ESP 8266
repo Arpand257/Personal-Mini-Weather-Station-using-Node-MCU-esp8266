@@ -1,0 +1,73 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <DHT.h>
+
+//WiFi Credentials
+const char* ssid = "Wifi Name";
+const char* password = "Wifi Password";
+
+// Pin Definitions
+#define DHTPIN D4
+#define DHTTYPE DHT11
+
+#define MQ135_PIN A0
+#define LDR_PIN D5
+#define RAIN_PIN D6
+
+// Objects
+DHT dht(DHTPIN, DHTTYPE);
+ESP8266WebServer server(80);
+
+// CSV Handler
+void handleCSV() {
+
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  int airQuality = analogRead(MQ135_PIN);
+  int sunlight = digitalRead(LDR_PIN);
+  int rain = digitalRead(RAIN_PIN);
+
+  String csv = "Temperature,Humidity,AirQuality,Sunlight,RainStatus\n";
+
+  csv += String(temperature) + ",";
+  csv += String(humidity) + ",";
+  csv += String(airQuality) + ",";
+  csv += (sunlight == LOW ? "Bright" : "Dark");
+  csv += ",";
+  csv += (rain == LOW ? "Raining" : "No Rain");
+
+  //HTTP Headers for Constant Reload 
+  server.sendHeader("Refresh", "2");        // reload every 2 seconds
+  server.sendHeader("Cache-Control", "no-cache");
+  server.send(200, "text/plain", csv);
+}
+
+//Setup
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+
+  pinMode(LDR_PIN, INPUT);
+  pinMode(RAIN_PIN, INPUT);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi Connected");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handleCSV);
+  server.begin();
+  Serial.println("Live CSV Server Started");
+}
+
+//Loop
+void loop() {
+  server.handleClient();
+}
