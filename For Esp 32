@@ -1,0 +1,64 @@
+/*--- It is for only csv output in web brouser using static ip---*/
+#include <WiFi.h>
+#include <WebServer.h>
+#include "DHT.h"
+
+const char* ssid = "YOUR_WIFI_NAME";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+WebServer server(80);
+
+#define DHTPIN 4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+#define MQ135_PIN 34
+#define LDR_PIN 26
+#define RAIN_PIN 27
+
+float temperature = 0;
+float humidity = 0;
+int airQuality = 0;
+bool isDay = false;
+bool isRaining = false;
+
+void handleWeather() {
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+  airQuality = analogRead(MQ135_PIN);
+
+  isDay = digitalRead(LDR_PIN);
+  isRaining = digitalRead(RAIN_PIN);
+
+  String json = "{";
+  json += "\"temperature\":" + String(temperature, 1) + ",";
+  json += "\"humidity\":" + String(humidity, 1) + ",";
+  json += "\"aqi\":" + String(airQuality) + ",";
+  json += "\"isDay\":" + String(isDay ? "true" : "false") + ",";
+  json += "\"rain\":\"" + String(isRaining ? "Yes" : "No") + "\"";
+  json += "}";
+
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", json);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(LDR_PIN, INPUT);
+  pinMode(RAIN_PIN, INPUT);
+
+  dht.begin();
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+
+  server.on("/weather", handleWeather);
+  server.begin();
+}
+
+void loop() {
+  server.handleClient();
+}
